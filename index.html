@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дневник Геймера</title>
+    
+    <!-- Подключение CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Подключение Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <style>
+        .router-link-active {
+            @apply bg-blue-700 text-white;
+        }
+        .game-card {
+            transition: all 0.3s ease;
+        }
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+        .slide-enter-active, .slide-leave-active {
+            transition: all 0.3s ease;
+        }
+        .slide-enter-from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        .slide-leave-to {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="app"></div>
+
+    <script>
+        const { createApp, ref, reactive, computed, onMounted, watch } = Vue;
+
+        // Централизованное хранилище данных с сохранением в localStorage
+        const createStore = () => {
+            const state = reactive({
+                games: JSON.parse(localStorage.getItem('gamer-diary-games')) || [],
+                diaryEntries: JSON.parse(localStorage.getItem('gamer-diary-entries')) || [],
+                tags: JSON.parse(localStorage.getItem('gamer-diary-tags')) || [],
+                nextGameId: parseInt(localStorage.getItem('gamer-diary-nextGameId')) || 1,
+                nextEntryId: parseInt(localStorage.getItem('gamer-diary-nextEntryId')) || 1,
+                nextTagId: parseInt(localStorage.getItem('gamer-diary-nextTagId')) || 1
+            });
+
+            // Автосохранение в localStorage
+            watch(() => state.games, (newGames) => {
+                localStorage.setItem('gamer-diary-games', JSON.stringify(newGames));
+            }, { deep: true });
+
+            watch(() => state.diaryEntries, (newEntries) => {
+                localStorage.setItem('gamer-diary-entries', JSON.stringify(newEntries));
+            }, { deep: true });
+
+            watch(() => state.tags, (newTags) => {
+                localStorage.setItem('gamer-diary-tags', JSON.stringify(newTags));
+            }, { deep: true });
+
+            watch(() => state.nextGameId, (newId) => {
+                localStorage.setItem('gamer-diary-nextGameId', newId.toString());
+            });
+
+            watch(() => state.nextEntryId, (newId) => {
+                localStorage.setItem('gamer-diary-nextEntryId', newId.toString());
+            });
+
+            watch(() => state.nextTagId, (newId) => {
+                localStorage.setItem('gamer-diary-nextTagId', newId.toString());
+            });
+
+            // Инициализация демо-данных если нет данных
+            const initializeDemoData = () => {
+                if (state.games.length === 0) {
+                    state.tags = [
+                        { id: 1, name: 'RPG', color: 'bg-purple-500' },
+                        { id: 2, name: 'Стратегия', color: 'bg-green-500' },
+                        { id: 3, name: 'Экшен', color: 'bg-red-500' },
+                        { id: 4, name: 'Инди', color: 'bg-yellow-500' },
+                        { id: 5, name: 'Сюжетная', color: 'bg-blue-500' },
+                        { id: 6, name: 'Открытый мир', color: 'bg-indigo-500' },
+                        { id: 7, name: 'Хоррор', color: 'bg-gray-800' }
+                    ];
+
+                    state.games = [
+                        {
+                            id: 1,
+                            title: 'The Witcher 3: Wild Hunt',
+                            description: 'Эпическая RPG о ведьмаке Геральте из Ривии в огромном открытом мире',
+                            platform: 'PC',
+                            releaseDate: '2015-05-19',
+                            cover: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co1r7g.jpg'
+                        },
+                        {
+                            id: 2,
+                            title: 'Cyberpunk 2077',
+                            description: 'Футуристический экшен-RPG в мире киберпанка от создателей Ведьмака',
+                            platform: 'PC',
+                            releaseDate: '2020-12-10',
+                            cover: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co2d3q.jpg'
+                        },
+                        {
+                            id: 3,
+                            title: 'Stardew Valley',
+                            description: 'Расслабляющая фермерская игра с элементами RPG и симулятора жизни',
+                            platform: 'PC',
+                            releaseDate: '2016-02-26',
+                            cover: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co2c8w.jpg'
+                        },
+                        {
+                            id: 4,
+                            title: 'The Last of Us Part II',
+                            description: 'Эмоциональная постапокалиптическая история о выживании и мести',
+                            platform: 'PlayStation',
+                            releaseDate: '2020-06-19',
+                            cover: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co2fup.jpg'
+                        },
+                        {
+                            id: 5,
+                            title: 'Hollow Knight',
+                            description: 'Исследовательский платформер с красивым ручным рисунком и сложным геймплеем',
+                            platform: 'PC',
+                            releaseDate: '2017-02-24',
+                            cover: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co1r7d.jpg'
+                        }
+                    ];
+
+                    state.diaryEntries = [
+                        {
+                            id: 1,
+                            gameId: 1,
+                            status: 'completed',
+                            startDate: '2023-01-15',
+                            endDate: '2023-03-20',
+                            hoursPlayed: 85,
+                            rating: 10,
+                            review: 'Великолепная игра! Лучший сюжет и персонажи, которых я встречал в видеоиграх. Боковые квесты проработаны не хуже основных.',
+                            tags: [1, 5, 6]
+                        },
+                        {
+                            id: 2,
+                            gameId: 2,
+                            status: 'completed',
+                            startDate: '2023-04-01',
+                            endDate: '2023-05-15',
+                            hoursPlayed: 60,
+                            rating: 8,
+                            review: 'Интересный мир и захватывающий сюжет, но некоторые баги мешают полному погружению. После обновлений стало значительно лучше.',
+                            tags: [1, 3, 6]
+                        },
+                        {
+                            id: 3,
+                            gameId: 3,
+                            status: 'in_progress',
+                            startDate: '2023-06-01',
+                            endDate: null,
+                            hoursPlayed: 45,
+                            rating: 9,
+                            review: 'Невероятно уютная и аддиктивная игра. Идеально для расслабления после тяжелого дня.',
+                            tags: [4, 5]
+                        },
+                        {
+                            id: 4,
+                            gameId: 4,
+                            status: 'planned',
+                            startDate: null,
+                            endDate: null,
+                            hoursPlayed: 0,
+                            rating: 0,
+                            review: '',
+                            tags: [3, 5]
+                        },
+                        {
+                            id: 5,
+                            gameId: 5,
+                            status: 'completed',
+                            startDate: '2023-02-10',
+                            endDate: '2023-03-05',
+                            hoursPlayed: 35,
+                            rating: 9,
+                            review: 'Прекрасный платформер с атмосферным миром и сложными боссами. Саундтрек просто волшебный.',
+                            tags: [3, 4]
+                        }
+                    ];
+
+                    state.nextGameId = 6;
+                    state.nextEntryId = 6;
+                    state.nextTagId = 8;
+                }
+            };
+
+            // Методы для работы с играми
+            const addGame = (gameData) => {
+                const game = {
+                    id: state.nextGameId++,
+                    ...gameData
+                };
+                state.games.push(game);
+                return game;
+            };
+
+            const findGame = (gameId) => {
+                return state.games.find(game => game.id === gameId);
+            };
+
+            // Методы для работы с дневником
+            const addDiaryEntry = (entryData) => {
+                const entry = {
+                    id: state.nextEntryId++,
+                    ...entryData
+                };
+                state.diaryEntries.push(entry);
+                return entry;
+            };
+
+            const updateDiaryEntry = (entryId, updates) => {
+                const entryIndex = state.diaryEntries.findIndex(entry => entry.id === entryId);
+                if (entryIndex !== -1) {
+                    state.diaryEntries[entryIndex] = { ...state.diaryEntries[entryIndex], ...updates };
+                }
+            };
+
+            const getDiaryEntryByGameId = (gameId) => {
+                return state.diaryEntries.find(entry => entry.gameId === gameId);
+            };
+
+            // Методы для работы с тегами
+            const addTag = (tagName, color = 'bg-gray-500') => {
+                const tag = {
+                    id: state.nextTagId++,
+                    name: tagName,
+                    color: color
+                };
+                state.tags.push(tag);
+                return tag;
+            };
+
+            const getTagById = (tagId) => {
+                return state.tags.find(tag => tag.id === tagId);
+            };
+
+            // Вычисляемые свойства
+            const completedGames = computed(() => {
+                return state.diaryEntries.filter(entry => entry.status === 'completed').length;
+            });
+
+            const totalHoursPlayed = computed(() => {
+                return state.diaryEntries.reduce((total, entry) => total + (entry.hoursPlayed || 0), 0);
+            });
+
+            return {
+                state,
+                initializeDemoData,
+                addGame,
+                findGame,
+                addDiaryEntry,
+                updateDiaryEntry,
+                getDiaryEntryByGameId,
+                addTag,
+                getTagById,
+                completedGames,
+                totalHoursPlayed
+            };
+        };
+
+        const store = createStore();
+
+        // Создание основного приложения
+        createApp({
+            setup() {
+                const currentView = ref('library');
+                const searchQuery = ref('');
+                const showAddGameModal = ref(false);
+                const showDiaryModal = ref(false);
+                const showFilters = ref(false);
+                const isLoading = ref(false);
+                
+                // Фильтры
+                const statusFilter = ref('all');
+                const platformFilter = ref('all');
+                const ratingFilter = ref('all');
+                const tagFilter = ref('all');
+                
+                // Формы
+                const newGame = reactive({
+                    title: '',
+                    description: '',
+                    platform: 'PC',
+                    releaseDate: ''
+                });
+                
+                const selectedGame = ref(null);
+                const editingEntry = ref(null);
+                const entryForm = reactive({
+                    status: 'not_started',
+                    startDate: '',
+                    endDate: '',
+                    hoursPlayed: 0,
+                    rating: 0,
+                    review: '',
+                    selectedTags: []
+                });
+
+                // Навигация
+                const navigation = [
+                    { id: 'library', name: 'Библиотека', icon: 'fa-gamepad' },
+                    { id: 'diary', name: 'Мой дневник', icon: 'fa-book' },
+                    { id: 'stats', name: 'Статистика', icon: 'fa-chart-bar' }
+                ];
+
+                const statusOptions = [
+                    { value: 'not_started', text: 'Не начата', color: 'bg-gray-500' },
+                    { value: 'planned', text: 'В планах', color: 'bg-yellow-500' },
+                    { value: 'in_progress', text: 'В процессе', color: 'bg-blue-500' },
+                    { value: 'completed', text: 'Пройдена', color: 'bg-green-500' },
+                    { value: 'dropped', text: 'Брошена', color: 'bg-red-500' }
+                ];
+
+                // Инициализация
+                onMounted(() => {
+                    store.initializeDemoData();
+                });
+
+                // Вычисляемые свойства
+                const filteredGames = computed(() => {
+                    let games = store.state.games;
+
+                    if (searchQuery.value) {
+                        games = games.filter(game => 
+                            game.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                            game.description.toLowerCase().includes(searchQuery.value.toLowerCase())
+                        );
+                    }
+
+                    return games;
+                });
+
+                const diaryEntriesWithGames = computed(() => {
+                    return store.state.diaryEntries.map(entry => {
+                        const game = store.findGame(entry.gameId);
+                        return {
+                            ...entry,
+                            game: game
+                        };
+                    }).filter(entry => entry.game);
+                });
+
+                const filteredDiaryEntries = computed(() => {
+                    let entries = diaryEntriesWithGames.value;
+
+                    if (statusFilter.value !== 'all') {
+                        entries = entries.filter(entry => entry.status === statusFilter.value);
+                    }
+
+                    if (platformFilter.value !== 'all') {
+                        entries = entries.filter(entry => entry.game.platform === platformFilter.value);
+                    }
+
+                    if (ratingFilter.value !== 'all') {
+                        const minRating = parseInt(ratingFilter.value);
+                        entries = entries.filter(entry => entry.rating >= minRating);
+                    }
+
+                    if (tagFilter.value !== 'all') {
+                        const tagId = parseInt(tagFilter.value);
+                        entries = entries.filter(entry => entry.tags.includes(tagId));
+                    }
+
+                    if (searchQuery.value) {
+                        entries = entries.filter(entry => 
+                            entry.game.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                            (entry.review && entry.review.toLowerCase().includes(searchQuery.value.toLowerCase()))
+                        );
+                    }
+
+                    return entries;
+                });
+
+                const uniquePlatforms = computed(() => {
+                    const platforms = new Set(store.state.games.map(game => game.platform));
+                    return Array.from(platforms);
+                });
+
+                const getActiveFiltersCount = computed(() => {
+                    let count = 0;
+                    if (statusFilter.value !== 'all') count++;
+                    if (platformFilter.value !== 'all') count++;
+                    if (ratingFilter.value !== 'all') count++;
+                    if (tagFilter.value !== 'all') count++;
+                    if (searchQuery.value) count++;
+                    return count;
+                });
+
+                const stats = computed(() => {
+                    const entries = store.state.diaryEntries;
+                    const games = store.state.games;
+                    
+                    // Основная статистика
+                    const totalGames = games.length;
+                    const completedGames = entries.filter(e => e.status === 'completed').length;
+                    const inProgressGames = entries.filter(e => e.status === 'in_progress').length;
+                    const plannedGames = entries.filter(e => e.status === 'planned').length;
+                    const droppedGames = entries.filter(e => e.status === 'dropped').length;
+                    const totalHours = entries.reduce((sum, e) => sum + (e.hoursPlayed || 0), 0);
+                    
+                    // Статистика по платформам
+                    const platformStats = {};
+                    games.forEach(game => {
+                        const entry = store.getDiaryEntryByGameId(game.id);
+                        if (entry) {
+                            platformStats[game.platform] = (platformStats[game.platform] || 0) + 1;
+                        }
+                    });
+                    
+                    // Статистика по оценкам
+                    const ratingStats = { 10: 0, 9: 0, 8: 0, 7: 0, 6: 0, 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+                    entries.forEach(entry => {
+                        if (entry.rating && entry.rating >= 1 && entry.rating <= 10) {
+                            ratingStats[entry.rating]++;
+                        }
+                    });
+                    
+                    // Статистика по тегам
+                    const tagStats = {};
+                    entries.forEach(entry => {
+                        entry.tags?.forEach(tagId => {
+                            const tag = store.getTagById(tagId);
+                            if (tag) {
+                                tagStats[tag.name] = (tagStats[tag.name] || 0) + 1;
+                            }
+                        });
+                    });
+                    
+                    // Недавно пройденные игры
+                    const recentlyCompleted = entries
+                        .filter(e => e.status === 'completed' && e.endDate)
+                        .sort((a, b) => new Date(b.endDate) - new Date(a.endDate))
+                        .slice(0, 5)
+                        .map(entry => {
+                            const game = store.findGame(entry.gameId);
+                            return { ...entry, game };
+                        })
+                        .filter(item => item.game);
+
+                    return {
+                        totalGames,
+                        completedGames,
+                        inProgressGames,
+                        plannedGames,
+                        droppedGames,
+                        totalHours,
+                        platformStats,
+                        ratingStats,
+                        tagStats,
+                        recentlyCompleted
+                    };
+                });
+
+                // Методы
+                const switchView = (viewId) => {
+                    currentView.value = viewId;
+                };
+
+                const openAddGameModal = () => {
+                    showAddGameModal.value = true;
+                };
+
+                const closeAddGameModal = () => {
+                    showAddGameModal.value = false;
+                    Object.assign(newGame, {
+                        title: '',
+                        description: '',
+                        platform: 'PC',
+                        releaseDate: ''
+                    });
+                };
+
+                const submitNewGame = () => {
+                    if (newGame.title.trim()) {
+                        store.addGame({
+                            ...newGame,
+                            cover: `https://via.placeholder.com/300x400/6B7280/FFFFFF?text=${encodeURIComponent(newGame.title)}`
+                        });
+                        closeAddGameModal();
+                    }
+                };
+
+                const getGameStatus = (gameId) => {
+                    const entry = store.getDiaryEntryByGameId(gameId);
+                    return entry ? entry.status : 'not_started';
+                };
+
+                const getStatusInfo = (status) => {
+                    const statusMap = {
+                        'not_started': { text: 'Не начата', color: 'bg-gray-500' },
+                        'planned': { text: 'В планах', color: 'bg-yellow-500' },
+                        'in_progress': { text: 'В процессе', color: 'bg-blue-500' },
+                        'completed': { text: 'Пройдена', color: 'bg-green-500' },
+                        'dropped': { text: 'Брошена', color: 'bg-red-500' }
+                    };
+                    return statusMap[status] || statusMap['not_started'];
+                };
+
+                const openDiaryModal = (game = null, entry = null) => {
+                    selectedGame.value = game;
+                    editingEntry.value = entry;
+
+                    if (entry) {
+                        // Редактирование существующей записи
+                        Object.assign(entryForm, {
+                            status: entry.status,
+                            startDate: entry.startDate || '',
+                            endDate: entry.endDate || '',
+                            hoursPlayed: entry.hoursPlayed || 0,
+                            rating: entry.rating || 0,
+                            review: entry.review || '',
+                            selectedTags: entry.tags || []
+                        });
+                    } else if (game) {
+                        // Новая запись для игры
+                        const existingEntry = store.getDiaryEntryByGameId(game.id);
+                        if (existingEntry) {
+                            Object.assign(entryForm, {
+                                status: existingEntry.status,
+                                startDate: existingEntry.startDate || '',
+                                endDate: existingEntry.endDate || '',
+                                hoursPlayed: existingEntry.hoursPlayed || 0,
+                                rating: existingEntry.rating || 0,
+                                review: existingEntry.review || '',
+                                selectedTags: existingEntry.tags || []
+                            });
+                            editingEntry.value = existingEntry;
+                        } else {
+                            // Новая запись
+                            Object.assign(entryForm, {
+                                status: 'not_started',
+                                startDate: '',
+                                endDate: '',
+                                hoursPlayed: 0,
+                                rating: 0,
+                                review: '',
+                                selectedTags: []
+                            });
+                        }
+                    }
+
+                    showDiaryModal.value = true;
+                };
+
+                const closeDiaryModal = () => {
+                    showDiaryModal.value = false;
+                    selectedGame.value = null;
+                    editingEntry.value = null;
+                };
+
+                const saveDiaryEntry = () => {
+                    if (!selectedGame.value) return;
+
+                    const entryData = {
+                        gameId: selectedGame.value.id,
+                        status: entryForm.status,
+                        startDate: entryForm.startDate,
+                        endDate: entryForm.status === 'completed' ? entryForm.endDate : null,
+                        hoursPlayed: parseInt(entryForm.hoursPlayed) || 0,
+                        rating: parseInt(entryForm.rating) || 0,
+                        review: entryForm.review,
+                        tags: [...entryForm.selectedTags]
+                    };
+
+                    if (editingEntry.value) {
+                        store.updateDiaryEntry(editingEntry.value.id, entryData);
+                    } else {
+                        store.addDiaryEntry(entryData);
+                    }
+
+                    closeDiaryModal();
+                };
+
+                const toggleTag = (tagId) => {
+                    const index = entryForm.selectedTags.indexOf(tagId);
+                    if (index > -1) {
+                        entryForm.selectedTags.splice(index, 1);
+                    } else {
+                        entryForm.selectedTags.push(tagId);
+                    }
+                };
+
+                const isTagSelected = (tagId) => {
+                    return entryForm.selectedTags.includes(tagId);
+                };
+
+                const formatDate = (dateString) => {
+                    if (!dateString) return '-';
+                    return new Date(dateString).toLocaleDateString('ru-RU');
+                };
+
+                const setStatusFilter = (status) => {
+                    statusFilter.value = statusFilter.value === status ? 'all' : status;
+                };
+
+                const setPlatformFilter = (platform) => {
+                    platformFilter.value = platformFilter.value === platform ? 'all' : platform;
+                };
+
+                const setRatingFilter = (rating) => {
+                    ratingFilter.value = ratingFilter.value === rating ? 'all' : rating;
+                };
+
+                const setTagFilter = (tagId) => {
+                    tagFilter.value = tagFilter.value === tagId ? 'all' : tagId;
+                };
+
+                const clearAllFilters = () => {
+                    statusFilter.value = 'all';
+                    platformFilter.value = 'all';
+                    ratingFilter.value = 'all';
+                    tagFilter.value = 'all';
+                    searchQuery.value = '';
+                };
+
+                const getProgressPercentage = (value, total) => {
+                    return total > 0 ? Math.round((value / total) * 100) : 0;
+                };
+
+                const getPlatformColor = (index) => {
+                    const colors = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500', 'bg-purple-500'];
+                    return colors[index % colors.length];
+                };
+
+                return {
+                    currentView,
+                    searchQuery,
+                    showAddGameModal,
+                    showDiaryModal,
+                    showFilters,
+                    isLoading,
+                    statusFilter,
+                    platformFilter,
+                    ratingFilter,
+                    tagFilter,
+                    newGame,
+                    selectedGame,
+                    editingEntry,
+                    entryForm,
+                    navigation,
+                    statusOptions,
+                    store,
+                    filteredGames,
+                    diaryEntriesWithGames,
+                    filteredDiaryEntries,
+                    uniquePlatforms,
+                    getActiveFiltersCount,
+                    stats,
+                    switchView,
+                    openAddGameModal,
+                    closeAddGameModal,
+                    submitNewGame,
+                    getGameStatus,
+                    getStatusInfo,
+                    openDiaryModal,
+                    closeDiaryModal,
+                    saveDiaryEntry,
+                    toggleTag,
+                    isTagSelected,
+                    formatDate,
+                    setStatusFilter,
+                    setPlatformFilter,
+                    setRatingFilter,
+                    setTagFilter,
+                    clearAllFilters,
+                    getProgressPercentage,
+                    getPlatformColor
+                };
+            },
+            template: `
+            <div class="min-h-screen bg-gray-100">
+                <!-- Header -->
+                <header class="bg-blue-600 text-white shadow-lg">
+                    <div class="container mx-auto px-4 py-4">
+                        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
+                            <h1 class="text-2xl font-bold flex items-center">
+                                <i class="fas fa-dragon mr-3"></i>
+                                Дневник Геймера
+                            </h1>
+                            
+                            <div class="flex flex-col lg:flex-row space-y-2 lg:space-y-0 lg:space-x-4 w-full lg:w-auto">
+                                <div class="relative">
+                                    <input 
+                                        v-model="searchQuery"
+                                        type="text" 
+                                        placeholder="Поиск игр или отзывов..."
+                                        class="w-full lg:w-64 px-4 py-2 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                    >
+                                    <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
+                                </div>
+                                
+                                <button 
+                                    @click="showFilters = !showFilters"
+                                    class="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg flex items-center justify-center transition-colors"
+                                >
+                                    <i class="fas fa-filter mr-2"></i>
+                                    Фильтры
+                                    <span 
+                                        v-if="getActiveFiltersCount > 0"
+                                        class="ml-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center"
+                                    >
+                                        {{ getActiveFiltersCount }}
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Расширенные фильтры -->
+                        <transition name="slide">
+                            <div 
+                                v-if="showFilters" 
+                                class="mt-4 bg-blue-700 p-4 rounded-lg"
+                            >
+                                <div class="flex justify-between items-center mb-3">
+                                    <span class="font-medium">Фильтры:</span>
+                                    <button 
+                                        @click="clearAllFilters"
+                                        class="text-sm bg-blue-800 hover:bg-blue-900 px-3 py-1 rounded transition-colors"
+                                    >
+                                        Сбросить все
+                                    </button>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <!-- Фильтр по статусу -->
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">Статус</label>
+                                        <select 
+                                            v-model="statusFilter"
+                                            class="w-full px-2 py-1 rounded text-gray-800"
+                                        >
+                                            <option value="all">Все статусы</option>
+                                            <option 
+                                                v-for="status in statusOptions" 
+                                                :key="status.value"
+                                                :value="status.value"
+                                            >
+                                                {{ status.text }}
+                                            </option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Фильтр по платформе -->
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">Платформа</label>
+                                        <select 
+                                            v-model="platformFilter"
+                                            class="w-full px-2 py-1 rounded text-gray-800"
+                                        >
+                                            <option value="all">Все платформы</option>
+                                            <option 
+                                                v-for="platform in uniquePlatforms" 
+                                                :key="platform"
+                                                :value="platform"
+                                            >
+                                                {{ platform }}
+                                            </option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Фильтр по оценке -->
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">Оценка</label>
+                                        <select 
+                                            v-model="ratingFilter"
+                                            class="w-full px-2 py-1 rounded text-gray-800"
+                                        >
+                                            <option value="all">Любая оценка</option>
+                                            <option value="9">9+ Отлично</option>
+                                            <option value="7">7+ Хорошо</option>
+                                            <option value="5">5+ Средне</option>
+                                            <option value="3">3+ Плохо</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Фильтр по тегам -->
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">Тег</label>
+                                        <select 
+                                            v-model="tagFilter"
+                                            class="w-full px-2 py-1 rounded text-gray-800"
+                                        >
+                                            <option value="all">Все теги</option>
+                                            <option 
+                                                v-for="tag in store.state.tags" 
+                                                :key="tag.id"
+                                                :value="tag.id"
+                                            >
+                                                {{ tag.name }}
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </transition>
+                    </div>
+                </header>
+
+                <!-- Navigation -->
+                <nav class="bg-white shadow-md">
+                    <div class="container mx-auto px-4">
+                        <div class="flex space-x-1 overflow-x-auto">
+                            <button 
+                                v-for="nav in navigation" 
+                                :key="nav.id"
+                                @click="switchView(nav.id)"
+                                :class="[
+                                    'flex items-center px-6 py-3 rounded-t-lg font-medium transition-colors whitespace-nowrap',
+                                    currentView === nav.id 
+                                        ? 'bg-blue-600 text-white' 
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                ]"
+                            >
+                                <i :class="['fas', nav.icon, 'mr-2']"></i>
+                                {{ nav.name }}
+                            </button>
+                        </div>
+                    </div>
+                </nav>
+
+                <!-- Main Content -->
+                <main class="container mx-auto px-4 py-8">
+                    <transition name="fade" mode="out-in">
+                        <!-- Библиотека -->
+                        <div v-if="currentView === 'library'" class="bg-white rounded-lg shadow-lg p-6">
+                            <div class="flex justify-between items-center mb-6">
+                                <h2 class="text-2xl font-bold text-gray-800">Библиотека игр</h2>
+                                <button 
+                                    @click="openAddGameModal"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors"
+                                >
+                                    <i class="fas fa-plus mr-2"></i>
+                                    Добавить игру
+                                </button>
+                            </div>
+
+                            <!-- Сетка игр -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                <div 
+                                    v-for="game in filteredGames" 
+                                    :key="game.id"
+                                    class="game-card bg-white rounded-lg shadow-md overflow-hidden border border-gray-200"
+                                >
+                                    <img 
+                                        :src="game.cover" 
+                                        :alt="game.title"
+                                        class="w-full h-48 object-cover"
+                                    >
+                                    <div class="p-4">
+                                        <div class="flex justify-between items-start mb-2">
+                                            <h3 class="font-bold text-lg text-gray-800">{{ game.title }}</h3>
+                                            <span 
+                                                :class="[
+                                                    'px-2 py-1 rounded-full text-xs text-white',
+                                                    getStatusInfo(getGameStatus(game.id)).color
+                                                ]"
+                                            >
+                                                {{ getStatusInfo(getGameStatus(game.id)).text }}
+                                            </span>
+                                        </div>
+                                        <p class="text-gray-600 text-sm mb-3 line-clamp-2">{{ game.description }}</p>
+                                        <div class="flex justify-between items-center text-sm text-gray-500">
+                                            <span class="flex items-center">
+                                                <i class="fas fa-tv mr-1"></i>
+                                                {{ game.platform }}
+                                            </span>
+                                            <span>{{ game.releaseDate }}</span>
+                                        </div>
+                                        <button 
+                                            @click="openDiaryModal(game, store.getDiaryEntryByGameId(game.id))"
+                                            :class="[
+                                                'w-full mt-3 px-3 py-2 rounded-lg transition-colors text-sm',
+                                                getGameStatus(game.id) === 'not_started' 
+                                                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                                                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                                            ]"
+                                        >
+                                            <i class="fas fa-edit mr-1"></i>
+                                            {{ getGameStatus(game.id) === 'not_started' ? 'Добавить в дневник' : 'Редактировать' }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Сообщение если игр нет -->
+                            <div 
+                                v-if="filteredGames.length === 0" 
+                                class="text-center py-12 text-gray-500"
+                            >
+                                <i class="fas fa-gamepad text-4xl mb-4"></i>
+                                <p>Игры не найдены</p>
+                                <button 
+                                    @click="openAddGameModal"
+                                    class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+                                >
+                                    Добавить первую игру
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Дневник -->
+                        <div v-else-if="currentView === 'diary'" class="bg-white rounded-lg shadow-lg p-6">
+                            <div class="flex justify-between items-center mb-6">
+                                <h2 class="text-2xl font-bold text-gray-800">Мой игровой дневник</h2>
+                                <div class="text-sm text-gray-600">
+                                    Всего записей: {{ filteredDiaryEntries.length }}
+                                </div>
+                            </div>
+
+                            <!-- Список записей дневника -->
+                            <div class="space-y-4">
+                                <div 
+                                    v-for="entry in filteredDiaryEntries" 
+                                    :key="entry.id"
+                                    class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                                >
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div class="flex items-start space-x-4">
+                                            <img 
+                                                :src="entry.game.cover" 
+                                                :alt="entry.game.title"
+                                                class="w-16 h-20 object-cover rounded"
+                                            >
+                                            <div>
+                                                <h3 class="font-bold text-lg text-gray-800">{{ entry.game.title }}</h3>
+                                                <p class="text-gray-600 text-sm">{{ entry.game.platform }}</p>
+                                                <div class="flex flex-wrap gap-1 mt-2">
+                                                    <span 
+                                                        v-for="tagId in entry.tags" 
+                                                        :key="tagId"
+                                                        :class="[
+                                                            'px-2 py-1 rounded-full text-xs text-white',
+                                                            store.getTagById(tagId)?.color || 'bg-gray-500'
+                                                        ]"
+                                                    >
+                                                        {{ store.getTagById(tagId)?.name }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <span 
+                                                :class="[
+                                                    'px-2 py-1 rounded-full text-xs text-white mb-2 inline-block',
+                                                    getStatusInfo(entry.status).color
+                                                ]"
+                                            >
+                                                {{ getStatusInfo(entry.status).text }}
+                                            </span>
+                                            <div class="text-yellow-500">
+                                                <i 
+                                                    v-for="star in 5" 
+                                                    :key="star"
+                                                    :class="[
+                                                        'fas',
+                                                        star <= entry.rating ? 'fa-star' : 'fa-star'
+                                                    ]"
+                                                    :class="star <= entry.rating ? 'text-yellow-500' : 'text-gray-300'"
+                                                ></i>
+                                                <span class="text-gray-600 ml-1">({{ entry.rating }}/10)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 mb-3">
+                                        <div>
+                                            <strong>Начало:</strong> {{ formatDate(entry.startDate) }}
+                                        </div>
+                                        <div>
+                                            <strong>Завершение:</strong> {{ formatDate(entry.endDate) }}
+                                        </div>
+                                        <div>
+                                            <strong>Время:</strong> {{ entry.hoursPlayed }} ч.
+                                        </div>
+                                    </div>
+
+                                    <div v-if="entry.review" class="mb-3">
+                                        <strong class="text-gray-700">Отзыв:</strong>
+                                        <p class="text-gray-600 mt-1">{{ entry.review }}</p>
+                                    </div>
+
+                                    <button 
+                                        @click="openDiaryModal(entry.game, entry)"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                                    >
+                                        <i class="fas fa-edit mr-1"></i>
+                                        Редактировать
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Сообщение если записей нет -->
+                            <div 
+                                v-if="filteredDiaryEntries.length === 0" 
+                                class="text-center py-12 text-gray-500"
+                            >
+                                <i class="fas fa-book-open text-4xl mb-4"></i>
+                                <p>Записей в дневнике пока нет</p>
+                                <p class="text-sm mt-2">Добавьте игры из библиотеки в дневник</p>
+                            </div>
+                        </div>
+
+                        <!-- Статистика -->
+                        <div v-else-if="currentView === 'stats'" class="space-y-6">
+                            <!-- Основные метрики -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <div class="bg-white rounded-lg shadow-lg p-6 text-center">
+                                    <div class="text-3xl font-bold text-blue-600 mb-2">{{ stats.totalGames }}</div>
+                                    <div class="text-gray-600">Всего игр в библиотеке</div>
+                                </div>
+                                <div class="bg-white rounded-lg shadow-lg p-6 text-center">
+                                    <div class="text-3xl font-bold text-green-600 mb-2">{{ stats.completedGames }}</div>
+                                    <div class="text-gray-600">Пройдено игр</div>
+                                </div>
+                                <div class="bg-white rounded-lg shadow-lg p-6 text-center">
+                                    <div class="text-3xl font-bold text-yellow-600 mb-2">{{ stats.inProgressGames }}</div>
+                                    <div class="text-gray-600">Игр в процессе</div>
+                                </div>
+                                <div class="bg-white rounded-lg shadow-lg p-6 text-center">
+                                    <div class="text-3xl font-bold text-purple-600 mb-2">{{ stats.totalHours }}</div>
+                                    <div class="text-gray-600">Часов в играх</div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <!-- Распределение по статусам -->
+                                <div class="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 class="text-xl font-bold mb-4 text-gray-800">Распределение по статусам</h3>
+                                    <div class="space-y-3">
+                                        <div v-for="status in statusOptions" :key="status.value" class="flex items-center justify-between">
+                                            <span class="flex items-center">
+                                                <span :class="['w-3 h-3 rounded-full mr-2', status.color]"></span>
+                                                {{ status.text }}
+                                            </span>
+                                            <span class="font-medium">
+                                                {{ stats[status.value + 'Games'] || 0 }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Распределение по платформам -->
+                                <div class="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 class="text-xl font-bold mb-4 text-gray-800">Игры по платформам</h3>
+                                    <div class="space-y-2">
+                                        <div 
+                                            v-for="(count, platform, index) in stats.platformStats" 
+                                            :key="platform"
+                                            class="flex items-center justify-between"
+                                        >
+                                            <span class="text-gray-700">{{ platform }}</span>
+                                            <div class="flex items-center space-x-2">
+                                                <div class="w-24 bg-gray-200 rounded-full h-2">
+                                                    <div 
+                                                        :class="['h-2 rounded-full', getPlatformColor(index)]"
+                                                        :style="{ width: getProgressPercentage(count, stats.totalGames) + '%' }"
+                                                    ></div>
+                                                </div>
+                                                <span class="text-sm text-gray-600 w-8">{{ count }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <!-- Распределение по оценкам -->
+                                <div class="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 class="text-xl font-bold mb-4 text-gray-800">Распределение по оценкам</h3>
+                                    <div class="space-y-2">
+                                        <div 
+                                            v-for="rating in [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]" 
+                                            :key="rating"
+                                            class="flex items-center justify-between"
+                                        >
+                                            <span class="flex items-center w-16">
+                                                <span class="text-yellow-500 mr-1">★</span>
+                                                {{ rating }}
+                                            </span>
+                                            <div class="flex items-center space-x-2 flex-1 max-w-xs">
+                                                <div class="w-full bg-gray-200 rounded-full h-3">
+                                                    <div 
+                                                        class="bg-yellow-500 h-3 rounded-full"
+                                                        :style="{ width: getProgressPercentage(stats.ratingStats[rating], stats.completedGames) + '%' }"
+                                                    ></div>
+                                                </div>
+                                                <span class="text-sm text-gray-600 w-8">{{ stats.ratingStats[rating] }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Популярные теги -->
+                                <div class="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 class="text-xl font-bold mb-4 text-gray-800">Популярные теги</h3>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span 
+                                            v-for="(count, tagName) in stats.tagStats" 
+                                            :key="tagName"
+                                            class="px-3 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium"
+                                        >
+                                            {{ tagName }} ({{ count }})
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Недавно пройденные игры -->
+                            <div class="bg-white rounded-lg shadow-lg p-6">
+                                <h3 class="text-xl font-bold mb-4 text-gray-800">Недавно пройденные игры</h3>
+                                <div class="space-y-3">
+                                    <div 
+                                        v-for="entry in stats.recentlyCompleted" 
+                                        :key="entry.id"
+                                        class="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                                    >
+                                        <div class="flex items-center space-x-3">
+                                            <img 
+                                                :src="entry.game.cover" 
+                                                :alt="entry.game.title"
+                                                class="w-12 h-16 object-cover rounded"
+                                            >
+                                            <div>
+                                                <h4 class="font-bold text-gray-800">{{ entry.game.title }}</h4>
+                                                <p class="text-sm text-gray-600">{{ entry.game.platform }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-yellow-500">
+                                                <i 
+                                                    v-for="star in 5" 
+                                                    :key="star"
+                                                    :class="[
+                                                        'fas',
+                                                        star <= entry.rating ? 'fa-star' : 'fa-star'
+                                                    ]"
+                                                    :class="star <= entry.rating ? 'text-yellow-500' : 'text-gray-300'"
+                                                ></i>
+                                            </div>
+                                            <p class="text-sm text-gray-600 mt-1">
+                                                Завершено: {{ formatDate(entry.endDate) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div 
+                                    v-if="stats.recentlyCompleted.length === 0" 
+                                    class="text-center py-6 text-gray-500"
+                                >
+                                    <i class="fas fa-trophy text-3xl mb-2"></i>
+                                    <p>Пока нет пройденных игр</p>
+                                </div>
+                            </div>
+                        </div>
+                    </transition>
+                </main>
+
+                <!-- Модальное окно добавления игры -->
+                <transition name="fade">
+                    <div 
+                        v-if="showAddGameModal" 
+                        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                    >
+                        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                            <h3 class="text-xl font-bold mb-4">Добавить новую игру</h3>
+                            <form @submit.prevent="submitNewGame">
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                                            Название игры *
+                                        </label>
+                                        <input 
+                                            v-model="newGame.title"
+                                            type="text" 
+                                            required
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Введите название игры"
+                                        >
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                                            Описание
+                                        </label>
+                                        <textarea 
+                                            v-model="newGame.description"
+                                            rows="3"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Описание игры"
+                                        ></textarea>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                Платформа
+                                            </label>
+                                            <select 
+                                                v-model="newGame.platform"
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            >
+                                                <option value="PC">PC</option>
+                                                <option value="PlayStation">PlayStation</option>
+                                                <option value="Xbox">Xbox</option>
+                                                <option value="Nintendo Switch">Nintendo Switch</option>
+                                                <option value="Mobile">Mobile</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                Дата выхода
+                                            </label>
+                                            <input 
+                                                v-model="newGame.releaseDate"
+                                                type="date"
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            >
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-end space-x-3 mt-6">
+                                    <button 
+                                        type="button"
+                                        @click="closeAddGameModal"
+                                        class="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                                    >
+                                        Отмена
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                                    >
+                                        Добавить игру
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </transition>
+
+                <!-- Модальное окно дневника -->
+                <transition name="fade">
+                    <div 
+                        v-if="showDiaryModal" 
+                        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                    >
+                        <div class="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                            <h3 class="text-xl font-bold mb-4">
+                                {{ editingEntry ? 'Редактировать запись' : 'Добавить в дневник' }}
+                            </h3>
+                            
+                            <div v-if="selectedGame" class="mb-6 p-4 bg-gray-50 rounded-lg">
+                                <div class="flex items-center space-x-4">
+                                    <img 
+                                        :src="selectedGame.cover" 
+                                        :alt="selectedGame.title"
+                                        class="w-16 h-20 object-cover rounded"
+                                    >
+                                    <div>
+                                        <h4 class="font-bold text-lg">{{ selectedGame.title }}</h4>
+                                        <p class="text-gray-600">{{ selectedGame.platform }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <form @submit.prevent="saveDiaryEntry">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <!-- Левая колонка -->
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                Статус *
+                                            </label>
+                                            <select 
+                                                v-model="entryForm.status"
+                                                required
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            >
+                                                <option 
+                                                    v-for="status in statusOptions" 
+                                                    :key="status.value"
+                                                    :value="status.value"
+                                                >
+                                                    {{ status.text }}
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <div class="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                    Дата начала
+                                                </label>
+                                                <input 
+                                                    v-model="entryForm.startDate"
+                                                    type="date"
+                                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                >
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                    Дата завершения
+                                                </label>
+                                                <input 
+                                                    v-model="entryForm.endDate"
+                                                    type="date"
+                                                    :disabled="entryForm.status !== 'completed'"
+                                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                >
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                Время в игре (часы)
+                                            </label>
+                                            <input 
+                                                v-model.number="entryForm.hoursPlayed"
+                                                type="number" 
+                                                min="0"
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            >
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                Оценка (0-10)
+                                            </label>
+                                            <input 
+                                                v-model.number="entryForm.rating"
+                                                type="range" 
+                                                min="0" 
+                                                max="10" 
+                                                class="w-full"
+                                            >
+                                            <div class="flex justify-between text-sm text-gray-600">
+                                                <span>0</span>
+                                                <span>Текущая: {{ entryForm.rating }}</span>
+                                                <span>10</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Правая колонка -->
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                Теги
+                                            </label>
+                                            <div class="flex flex-wrap gap-2">
+                                                <button 
+                                                    v-for="tag in store.state.tags" 
+                                                    :key="tag.id"
+                                                    type="button"
+                                                    @click="toggleTag(tag.id)"
+                                                    :class="[
+                                                        'px-3 py-1 rounded-full text-sm transition-colors',
+                                                        isTagSelected(tag.id) 
+                                                            ? tag.color + ' text-white' 
+                                                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                    ]"
+                                                >
+                                                    {{ tag.name }}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                Отзыв и заметки
+                                            </label>
+                                            <textarea 
+                                                v-model="entryForm.review"
+                                                rows="6"
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                placeholder="Ваши впечатления от игры..."
+                                            ></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end space-x-3 mt-6">
+                                    <button 
+                                        type="button"
+                                        @click="closeDiaryModal"
+                                        class="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                                    >
+                                        Отмена
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                                    >
+                                        {{ editingEntry ? 'Обновить' : 'Сохранить' }}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </transition>
+
+                <!-- Уведомление о загрузке -->
+                <transition name="fade">
+                    <div 
+                        v-if="isLoading"
+                        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+                    >
+                        <div class="bg-white rounded-lg p-6 flex items-center space-x-3">
+                            <i class="fas fa-spinner fa-spin text-blue-600 text-xl"></i>
+                            <span>Загрузка...</span>
+                        </div>
+                    </div>
+                </transition>
+            </div>
+            `
+        }).mount('#app');
+    </script>
+</body>
+</html>
